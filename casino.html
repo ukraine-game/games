@@ -74,19 +74,6 @@ button:hover { background: #45a049; }
 .bomb-cheat {
   box-shadow: 0 0 10px 3px yellow;
 }
-#mobileMenu {
-  display: none;
-  flex-direction: column;
-  margin-top: 10px;
-  background: #1c1c1c;
-  padding: 10px;
-  border-radius: 10px;
-  text-align: center;
-}
-#mobileMenu button {
-  margin-top: 5px;
-  width: 150px;
-}
 </style>
 </head>
 <body>
@@ -100,11 +87,6 @@ button:hover { background: #45a049; }
 <div id="game"></div>
 <button id="finishBtn">Закінчити гру</button>
 <button id="promoBtn" style="display:none;">Промокод</button>
-<div id="mobileMenu">
-  <button onclick="activateCheat()">💣 Показати бомби</button>
-  <button onclick="removeBombs()">❌ Забрати бомби</button>
-  <button onclick="giveMoney(5000)">💰 Додати 5000$</button>
-</div>
 <script>
 let balance = 2500;
 let opened = 0;
@@ -118,12 +100,10 @@ const balanceEl = document.getElementById("balance");
 const winEl = document.getElementById("winAmount");
 const finishBtn = document.getElementById("finishBtn");
 const promoBtn = document.getElementById("promoBtn");
-const mobileMenu = document.getElementById("mobileMenu");
 
 // Мобільна версія
 if(/Mobi|Android/i.test(navigator.userAgent)){
     promoBtn.style.display = "block";
-    mobileMenu.style.display = "flex";
     promoBtn.onclick = () => {
         const code = prompt("Введіть код:");
         if(code === "Bomb") activateCheat();
