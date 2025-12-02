@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8" />
+<title>Casino 5x5</title>
+<style>
+body {
+  background: #0f0f0f;
+  color: #fff;
+  font-family: Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0;
+  padding: 20px;
+  user-select: none;
+}
+#game {
+  display: grid;
+  grid-template-columns: repeat(5, 80px);
+  grid-gap: 10px;
+  margin-top: 25px;
+}
+.card {
+  width: 80px;
+  height: 80px;
+  background: #111;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.card:hover { transform: scale(1.05); }
+.revealed { cursor: default; }
+.bomb, .crystal {
+  font-size: 32px;
+}
+#info, #moneyWindow {
+  margin-top: 15px;
+  background: #1c1c1c;
+  padding: 15px;
+  border-radius: 10px;
+  text-align: center;
+  min-width: 250px;
+}
+#moneyWindow { margin-top: 10px; }
+button {
+  margin-top: 10px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background: #4caf50;
+  color: white;
+  cursor: pointer;
+  font-size: 16px;
+}
+button:hover { background: #45a049; }
+.explosion-piece {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #ff3;
+  border-radius: 2px;
+  animation: explode 0.6s ease-out forwards;
+}
+@keyframes explode {
+  from { transform: translate(0,0) scale(1); opacity: 1; }
+  to { transform: translate(var(--dx), var(--dy)) scale(0.2); opacity: 0; }
+}
+.bomb-cheat {
+  box-shadow: 0 0 10px 3px yellow;
+}
+</style>
+</head>
+<body>
+<h1>💎 Casino 5×5</h1>
+<div id="info">
+  <div>Баланс: <span id="balance">2500</span>$</div>
+</div>
+<div id="moneyWindow">
+  Потенційний виграш: <span id="winAmount">0</span>$
+</div>
+<div id="game"></div>
+<button id="finishBtn">Закінчити гру</button>
+<button id="promoBtn" style="display:none;">Промокод</button>
+<script>
+let balance = 2500;
+let opened = 0;
+let bombs = [];
+let gameOver = false;
+let reward = 0;
+let cheatActive = false;
+
+const gameField = document.getElementById("game");
+const balanceEl = document.getElementById("balance");
+const winEl = document.getElementById("winAmount");
+const finishBtn = document.getElementById("finishBtn");
+const promoBtn = document.getElementById("promoBtn");
+
+// Мобільна версія
+if(/Mobi|Android/i.test(navigator.userAgent)){
+    promoBtn.style.display = "block";
+    promoBtn.onclick = () => {
+        const code = prompt("Введіть код:");
+        if(code === "Bomb") activateCheat();
+        else if(code === "Rem") removeBombs();
+        else if(code.startsWith("give(") && code.endsWith(")")){
+            let sum = Number(code.slice(5,-1));
+            if(!isNaN(sum)) giveMoney(sum);
+        }
+    }
+}
+
+// Audio
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function beep(f, d, t="sine", v=0.2){
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = t;
+  o.frequency.value = f;
+  g.gain.value = v;
+  o.connect(g);
+  g.connect(audioCtx.destination);
+  o.start(); o.stop(audioCtx.currentTime + d);
+}
+const sClick = () => beep(300,0.1,"square",0.15);
+const sCrystal = () => beep(850,0.25,"triangle",0.22);
+const sBomb = () => beep(120,0.4,"sawtooth",0.28);
+
+startGame();
+
+function startGame(){
+  gameField.innerHTML = "";
+  bombs = [];
+  opened = 0;
+  reward = 0;
+  gameOver = false;
+  balance -= 500;
+  balanceEl.textContent = balance;
+  winEl.textContent = reward;
+
+  while(bombs.length < 3){
+    let r = Math.floor(Math.random()*25);
+    if(!bombs.includes(r)) bombs.push(r);
+  }
+
+  for(let i=0;i<25;i++){
+    const c = document.createElement("div");
+    c.className = "card";
+    c.dataset.id = i;
+    c.onclick = onCard;
+    gameField.appendChild(c);
+  }
+
+  if(cheatActive) showBombs();
+}
+
+function onCard(){
+  if(gameOver) return;
+  const id = Number(this.dataset.id);
+  if(this.classList.contains("revealed")) return;
+
+  sClick();
+  this.classList.add("revealed");
+
+  if(bombs.includes(id)){
+    this.innerHTML = `<div class='bomb'>💣</div>`;
+    sBomb();
+    explodeAround(id);
+    gameOver = true;
+    reward = 0;
+    winEl.textContent = reward;
+    setTimeout(() => startGame(), 1500);
+    return;
+  }
+
+  this.innerHTML = `<div class='crystal'>🔷</div>`;
+  sCrystal();
+  opened++;
+  reward += 500;
+  winEl.textContent = reward;
+}
+
+function explodeAround(id){
+  const neighbors = [-6,-5,-4,-1,1,4,5,6];
+  neighbors.forEach(n=>{
+    let cell = gameField.children[id+n];
+    if(!cell) return;
+    for(let i=0;i<12;i++){
+      const p = document.createElement("div");
+      p.className = "explosion-piece";
+      p.style.setProperty("--dx", (Math.random()*80-40)+"px");
+      p.style.setProperty("--dy", (Math.random()*80-40)+"px");
+      cell.appendChild(p);
+      setTimeout(()=>p.remove(), 600);
+    }
+  });
+}
+
+finishBtn.onclick = ()=>{
+  if(gameOver) return;
+  balance += reward;
+  balanceEl.textContent = balance;
+  winEl.textContent = 0;
+  setTimeout(()=>startGame(),300);
+};
+
+// --- Чіти ---
+function showBombs(){
+  bombs.forEach(i=>{
+    const c = gameField.children[i];
+    if(c && !c.classList.contains("revealed")){
+      c.classList.add("bomb-cheat");
+    }
+  });
+}
+function activateCheat() {
+  cheatActive = true;
+  showBombs();
+}
+function removeBombs() {
+  bombs = [];
+  [...gameField.children].forEach(card => card.classList.remove("bomb-cheat"));
+  console.log("Всі бомби видалено!");
+}
+function giveMoney(amount) {
+  if(!amount || isNaN(amount)) {
+    console.log("Вкажи суму, наприклад giveMoney(5000)");
+    return;
+  }
+  balance += Number(amount);
+  balanceEl.textContent = balance;
+  console.log("Видано:", amount, "$ | Новий баланс:", balance);
+}
+
+// Для консолі F12
+window.activateCheat = activateCheat;
+window.removeBombs = removeBombs;
+window.giveMoney = giveMoney;
+</script>
+</body>
+</html>
